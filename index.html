@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Chatroom with Gemini API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            background-color: #333;
+            /* Dark background */
+            color: #ccc;
+            /* Light text */
+        }
+
+        h1 {
+            text-align: center;
+            color: #fff;
+            /* White text for headings */
+        }
+
+        #messageForm {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        #messageInput {
+            width: 70%;
+            padding: 10px;
+            border: 1px solid #555;
+            /* Darker borders */
+            background-color: #222;
+            /* Dark input fields */
+            color: #ddd;
+            /* Light text */
+            border-radius: 5px;
+            outline: none;
+        }
+
+        #messageInput:focus {
+            border-color: dodgerblue;
+        }
+
+        #messageInput::placeholder {
+            color: #777;
+            /* Darker placeholder */
+        }
+
+        #messageInput:focus::placeholder {
+            color: transparent;
+        }
+
+        #sendMessageBtn {
+            padding: 10px 20px;
+            background-color: #555;
+            /* Darker button */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            outline: none;
+        }
+
+        #sendMessageBtn:hover {
+            background-color: #777;
+            /* Lighter on hover */
+        }
+
+        #messages {
+            padding: 0 20px;
+            overflow-y: scroll;
+            max-height: 300px;
+            background-color: #222;
+            /* Dark background for messages */
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            color: #ccc;
+            /* Light text for messages */
+        }
+
+        .userMessage {
+            background-color: #444;
+            /* Darker user message */
+            text-align: right;
+        }
+
+        .botMessage {
+            background-color: #555;
+            /* Darker bot message */
+            text-align: left;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Chatroom</h1>
+    <form id="messageForm">
+        <input type="text" id="messageInput" placeholder="Type your message here..." required>
+        <button id="sendMessageBtn" type="submit">Send</button>
+    </form>
+    <div id="sceneImage" style="text-align:center; margin-top:20px;">
+        <!-- 圖片將在這裡顯示 -->
+    </div>
+    <div id="messages"></div>
+    <script>
+        var conversationHistory = [];
+
+        var apiKey = prompt("Please enter your API key:","")
+        if(!apiKey){
+            alert("API key and name are required to use in the chatroom.");
+        } else {
+            document.getElementById('messageForm').addEventListener('submit', function (event) {
+                event.preventDefault();
+                var message = document.getElementById('messageInput').value;
+
+                addToConversationHistory('user', message);
+                displayMessage(message, 'user');
+
+                fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + apiKey, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        "contents": conversationHistory,
+                        "safetySettings": [
+                            {
+                                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                                "threshold": "BLOCK_ONLY_HIGH"
+                            },
+                            {
+                                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                                "threshold": "BLOCK_ONLY_HIGH"
+                            },
+                        ],
+                        "generationConfig": {
+                            "stopSequences": [
+                                ""
+                            ],
+                            "temperature": 1.0,
+                            "maxOutputTokens": 2048,
+                            "topP": 0.8,
+                            "topK": 10
+                        }
+                    })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        var responseText = data.candidates[0].content.parts[0].text;
+                        addToConversationHistory('model', responseText);
+                        displayMessage(responseText, 'bot');
+                    })
+                    .catch(error => console.error('Error:', error));
+
+                document.getElementById('messageInput').value = '';
+            });
+        }
+        
+        function addToConversationHistory(role, text) {
+            conversationHistory.push({
+                "role": role,
+                "parts": [{
+                    "text": text
+                }]
+            });
+        }
+
+        function displayMessage(message, sender) {
+            var messageElement = document.createElement('div');
+            var formatMessage = formatText(message);
+            messageElement.innerHTML = formatMessage;
+            messageElement.classList.add('message');
+            if (sender === 'user') {
+                messageElement.classList.add('userMessage');
+            } else {
+                messageElement.classList.add('botMessage');
+            }
+            document.getElementById('messages').appendChild(messageElement);
+            // Scroll to bottom
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            updateSceneImage(message);
+        }
+
+        function updateSceneImage(responseText) {
+            let sceneMatch = responseText.match(/場景：(.*?)\s/); // 使用正則表達式匹配場景描述
+            if (sceneMatch && sceneMatch[1]) {
+                let scene = sceneMatch[1];
+                console.log(scene);
+                // 檢查scene是否包含"宿舍"
+                if (scene.includes("宿舍")) {
+                    document.getElementById('sceneImage').innerHTML = '<img src="../img/dorm.jpeg" alt="Dorm" style="width:500px;">';
+                } else if (scene.includes("聚會")) {
+                    document.getElementById('sceneImage').innerHTML = '<img src="../img/party.jpeg" alt="Dorm" style="width:500px;">';
+                } else if (scene.includes("圖書館")) {
+                    document.getElementById('sceneImage').innerHTML = '<img src="../img/library.jpeg" alt="Dorm" style="width:500px;">';
+                }
+                else {
+                    // 如果不包含"宿舍"，可以在這裡處理其他情況或者不進行任何操作
+                    // 例如清空圖片或顯示預設圖片
+                    document.getElementById('sceneImage').innerHTML = ''; // 清空圖片
+                }
+            }
+        }
+
+        function formatText(text){
+        let formattedText=text.replace(/\*\*(.*?)\*\*/g,'<br><strong>$1</strong>');
+        formattedText=formattedText.replace(/\*(.*?)\s/g,'<br>$1');
+        return formattedText;
+        }
+
+        document.getElementById('startButton').addEventListener('click', function(){
+            conversationHistory.push({
+                "role":'user',
+                "parts": [{
+                    "text": ˋ
+                
+ 
+                }]
+        })
+        fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + apiKey, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        "contents": conversationHistory,
+                        "safetySettings": [
+                            {
+                                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                                "threshold": "BLOCK_ONLY_HIGH"
+                            },
+                            {
+                                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                                "threshold": "BLOCK_ONLY_HIGH"
+                            },
+                        ],
+                        "generationConfig": {
+                            "stopSequences": [
+                                ""
+                            ],
+                            "temperature": 1.0,
+                            "maxOutputTokens": 2048,
+                            "topP": 0.8,
+                            "topK": 10
+                        }
+                    })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        var responseText = data.candidates[0].content.parts[0].text;
+                        addToConversationHistory('model', responseText);
+                        displayMessage(responseText, 'bot');
+                    })
+                    .catch(error => console.error('Error:', error));
+                })
+    </script>
+    腳本： 
+    """ 
+    遊戲標題：險惡叢林JUMANJI 
+    遊戲背景 
+    亞歷克斯是一位剛入學的大學新生，他跟朋友在駕駛直升機的時候，在叢林墜機了。遊戲通過亞歷克斯的互動和選擇來進行叢林生存探險。 
+    
+    主要角色： 
+    艾力克斯：主角，內向的大學新生。 
+    莉莉：艾力克斯的女友，開朗活潑。 
+    捷克：艾力克斯的同學，溫和且善於聆聽。 
+    
+    遊戲腳本流程 
+    開場： （場景：一片叢林，四位探險者站在墜毀的飛機殘骸旁。） 
+    艾力克斯：我們必須保持冷靜，現在最重要的是找到食物和水，然後想辦法聯繫救援。 
+    莉莉：對，我們應該先檢查一下大家的傷勢。 
+    捷克：我可以試著修理飛機的無線電設備，但需要一些工具。 
+    選擇A：幫助莉莉檢查傷勢。 選擇B：幫捷克找工具。 
+    （場景：飛機殘骸邊） 
+    
+    若選擇A，開始跟莉莉幫大家檢查傷勢。 
+    （場景：飛機殘骸邊，艾力克斯和莉莉開始檢查大家的傷勢。）
+    艾力克斯：莉莉，你的手腕看起來有點腫，我來幫你包紮一下。
+    莉莉：謝謝你，艾力克斯。你的背部好像有些擦傷，我來幫你清理一下傷口。
+    捷克：我覺得我的腳踝有點疼，但應該沒問題。你們能幫我找一些樹枝和繩子嗎？我可以用它們來固定無線電設備。
+
+    選擇A1：跟艾力克斯一起尋找水源。 （選擇後進入尋找水源劇情）  
+    選擇A2：幫捷克修理無線電。（選擇後進修理無線電劇情。） 
+    
+    若選擇B，幫捷克修理無線電。  
+    選擇B1：繼續幫捷克修理無線電。（選擇後進入修理無線電劇情）  
+    選擇B2：幫助莉莉檢查傷勢。（選擇後進檢查傷勢劇情） 
+    
+    尋找水源： 
+    （場景：叢林中） 
+    艾力克斯：我們需要在找到一條小溪或湖泊，這樣才能確保有足夠的水源。 
+    玩家：那裡好像有水的聲音，我們去看看吧
+    （兩人走向水聲的方向，發現了一條小溪。）
+    （找到水源後） 
+    艾力克斯：太好了，我們找到了水源，現在我們需要製作一些簡單的容器來盛水。
+    莉莉：我們可以用一些大葉子來做臨時的容器。這樣我們可以把水帶回營地。
+    選擇A3：返回營地告訴大家這個好消息。（選擇後進入結局，根據玩家的選擇進行反思及回顧） 
+    選擇B3：留在這，尋找更多水源。（選擇後進入結局，根據玩家的選擇進行反思及回顧） 
+    
+    修理無線電： 
+    （場景：飛機殘骸邊，艾力克斯和捷克開始搜尋工具。） 
+    捷克：我們找到了一些需要的工具，但還缺少一些零件。 
+    艾力克斯：這裡有一個箱子，裡面有一些工具和零件。
+    玩家：我們可以試著從飛機的其他部分拆下來一些。 
+    捷克：好主意，讓我們試試看。 
+    （修理過程中） 
+    捷克：好了，無線電好像有反應了，我們試著發出求救訊號。 
+    選擇A4：繼續調適無線電，確保訊號穩定。（選擇後進入結局，根據玩家的選擇進行反思及回顧） 
+    選擇B4：立即發出求救訊號。
+    （選擇後進入結局，根據玩家的選擇進行反思及回顧） 
+    結局： 
+    成功逃離叢林：成功逃離叢林，修理好無線電，並發出求救訊號（A3和B4）。 
+    未能逃離叢林：未能成功找到水源或修理好無線電，無法發出求救訊號。（A4和B3）。
+    
+     遊戲結尾 這樣設計的文字冒險遊戲可以讓玩家感受到不同選擇對故事發展的影響，進一步提升遊戲的沉浸感和可玩性。
+    """ 請根據腳本中的對話，根據"""開場"""到"""尋找水源"""最後到"""修理無線電"""進行，開始一個文字冒險遊戲，每一次的對話，都需要呈現以下格式與資訊： 
+    <場景>：目前故事的背景為何 
+    <選擇>：在每一次的對話中，你都會根據腳本給我可以選擇的動作，根據我選擇的動作繼續接下來的劇情，整體劇情會圍繞腳本發展。 
+    
+    根據我的選擇進行故事就好，不要幫我做出選擇
+ 
+
+</body>
+
+</html>
